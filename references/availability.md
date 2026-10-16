@@ -6,12 +6,12 @@ Generated slots say what *could* be booked. Availability subtracts what already 
 
 | Source | Kind | Effect | Notes |
 |---|---|---|---|
-| Active booking of this service | `BOOKING` | `quantity -= seats` (default 1) | Overlap, not slot ID: a 09:00–10:00 booking also reduces an overlapping 09:30 slot of another strategy |
+| Active booking of this service | `BOOKING` | `quantity -= seats` (default 1) | Overlap, not slot ID: a 09:00 to 10:00 booking also reduces an overlapping 09:30 slot of another strategy |
 | Blackout / exception on the service, its location or its hosts | `BLOCK` | Slot removed | Holidays, maintenance, sick days |
 | External calendar busy time of a host | `BLOCK` | Slot removed | Read the stored UTC instants; see below |
 | A host's booking of a **different** service | `BLOCK` | Slot removed | The host is elsewhere |
-| A host's booking of **this** service | — | Already a `BOOKING` | Adding it as `BLOCK` too hides slots with free seats |
-| Shared resource (room, court, device) | cap | `quantity = min(quantity, capacity − overlapping bookings)` | Counts bookings, not seats: one booking occupies one unit |
+| A host's booking of **this** service | none | Already a `BOOKING` | Adding it as `BLOCK` too hides slots with free seats |
+| Shared resource (room, court, device) | cap | `quantity = min(quantity, capacity - overlapping bookings)` | Counts bookings, not seats: one booking occupies one unit |
 | Working hours of the location | filter | Slot removed unless it starts and ends inside that local day's hours | A day missing from the map is closed |
 
 Inactive bookings (`CANCELED`, `REJECTED`, or the host's equivalents) are ignored everywhere. Full slots
@@ -24,19 +24,19 @@ Overlap is half-open: a slot ending at 10:00 does not collide with a booking sta
 Store each busy event as a block with **UTC `from`/`to`**. A calendar's own zone (the user's Google
 calendar, an Outlook mailbox) is irrelevant once the event is an instant. Two mistakes to avoid:
 
-- Storing the event's local wall clock and converting it later with the *project's* zone — correct only
+- Storing the event's local wall clock and converting it later with the *project's* zone. That is correct only
   when the calendar and project zones agree.
-- Storing UTC and then converting it again as if it were wall clock — shifts every event by the offset.
+- Storing UTC and then converting it again as if it were wall clock. That shifts every event by the offset.
 
 All-day events become blocks from local midnight to the next local midnight in the calendar's zone,
 via `zonedToUtc(date, '00:00', calendarZone)`.
 
 ## Working hours
 
-`WorkingHours` maps `MONDAY`…`SUNDAY` to `{ timeFrom, timeTo }` in the location's zone. Missing
+`WorkingHours` maps `MONDAY` to `SUNDAY` to `{ timeFrom, timeTo }` in the location's zone. Missing
 `timeFrom` is 00:00, missing `timeTo` is 24:00, and `timeTo <= timeFrom` closes on the next day (a bar
-open 18:00–02:00). The check compares instants on the slot's local start date, so a 23:00–00:00 slot is
-outside 08:00–17:00 — comparing only "HH:mm" strings lets it through because "00:00" < "17:00".
+open 18:00 to 02:00). The check compares instants on the slot's local start date, so a 23:00 to 00:00 slot is
+outside 08:00 to 17:00. Comparing only "HH:mm" strings lets it through because "00:00" < "17:00".
 
 Working hours are a filter on top of strategies. Prefer encoding hours in the strategies themselves;
 keep working hours for location-wide limits that apply to many services.
@@ -44,7 +44,7 @@ keep working hours for location-wide limits that apply to many services.
 ## The engine side
 
 ```ts
-// slots/availability.ts — generated slots minus what is already taken. Pure.
+// lib/slots/availability.ts: generated slots minus what is already taken. Pure.
 import { addDays, formatWithOffset, timeToSeconds, wallClock, zonedToUtc } from './timezone';
 import { DAY_ORDER, type DayOfWeek, type GeneratedSlot } from './types';
 
@@ -124,7 +124,7 @@ export function buildAvailability(input: AvailabilityInput): Map<string, Generat
   return map;
 }
 
-/** Compared as instants on the slot's local start date, so a slot ending after midnight is outside 08:00–17:00. */
+/** Compared as instants on the slot's local start date, so a slot ending after midnight is outside 08:00 to 17:00. */
 export function isWithinWorkingHours(slot: Interval, timeZone: string, hours: WorkingHours): boolean {
   const { date, weekday } = wallClock(slot.from, timeZone);
   const day = hours[DAY_ORDER[weekday] as DayOfWeek];
@@ -172,7 +172,7 @@ export function toSlotOutput(slots: Iterable<GeneratedSlot>, timeZone: string): 
 
 /**
  * The booking path: resolve requested IDs against ONE availability map built
- * from now to the horizon. Never regenerate per requested slot — each
+ * from now to the horizon. Never regenerate per requested slot: each
  * generation walks every strategy to the horizon, and an 18-slot booking that
  * did so 18 times ran past a 100s edge timeout.
  */
@@ -200,7 +200,7 @@ function seatsOf(seats: number | null | undefined): number {
 same availability map, so nothing the listing hides can be booked by ID.
 
 ```ts
-// slots/service.ts — the one entry point the API layer calls. The store is the seam.
+// lib/slots/service.ts: the one entry point the API layer calls. The store is the seam.
 import {
   buildAvailability,
   resolveSlotsForBooking,
@@ -337,10 +337,10 @@ async function computeAvailability(
 ## The booking path
 
 1. Authenticate and resolve the service **from storage** (tenant comes from the stored row).
-2. `prepareBookingSlots(store, service, slotIds, seats, now)` — one generation, N lookups. Errors:
+2. `prepareBookingSlots(store, service, slotIds, seats, now)`: one generation, N lookups. Errors:
    `slot-no-longer-available` (ID unknown: wrong service, past, blocked, outside hours, strategy edited),
    `slot-has-not-enough-capacity`.
-3. Open the write transaction and **re-count seats from the bookings themselves** — Firestore:
+3. Open the write transaction and **re-count seats from the bookings themselves**. Firestore:
    `assertCapacityInTransaction` in [firestore-backend.md](firestore-backend.md); Postgres: the
    `book_slots` function in [supabase-backend.md](supabase-backend.md). Generation ran outside the
    transaction and two guests can both have seen the last seat.
@@ -354,14 +354,14 @@ Rescheduling is the same path for the new slots, with the old booking cancelled 
 
 | Field | Example | Notes |
 |---|---|---|
-| `slotId` | `9b2f…` | Send back to book |
+| `slotId` | `9b2f...` | Send back to book |
 | `dateTimeFrom` / `dateTimeTo` | `2026-11-09T08:00:00.000Z` | Canonical UTC |
 | `dateTimeISOFrom` / `dateTimeISOTo` | `2026-11-09T09:00:00+01:00` | Display; same instant |
 | `duration` | `PT1H` | |
 | `quantity` / `capacity` | `2` / `4` | Free seats / seats at creation |
 | `labels`, `strategyId` | | Filtering in the UI |
 
-Clients must render with the offset field or format the UTC value in the service's zone — never in the
+Clients must render with the offset field or format the UTC value in the service's zone, never in the
 browser's zone unless that is what the product wants.
 
 ## Checklist

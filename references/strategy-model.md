@@ -1,20 +1,20 @@
 # Strategy model
 
 A strategy is a rule that produces slots. A service has any number of them; their slots are merged. To
-offer 09:00–12:00 and 13:00–17:00 (a lunch break), write two RANGE strategies — one strategy has one
-daily window.
+offer 09:00 to 12:00 and 13:00 to 17:00 (a lunch break), write two RANGE strategies, since one
+strategy has one daily window.
 
 ## The four types
 
 | Type | Produces | Typical use |
 |---|---|---|
-| `RANGE` | On every matching day, slots of `slotDuration` every `slotInterval` inside `start.time`–`end.time` | Opening hours, appointments |
+| `RANGE` | On every matching day, slots of `slotDuration` every `slotInterval` inside `start.time` to `end.time` | Opening hours, appointments |
 | `PERIODICITY` | Same, but only on the Nth weekday(s) of the month (`tendency`) | "First Monday", "last Friday", monthly classes |
-| `ONCE` | One slot at fixed instants `start`–`end` | A single event or workshop |
+| `ONCE` | One slot at fixed instants `start` to `end` | A single event or workshop |
 | `DAY_RANGE` | One slot per matching local day, midnight to midnight | Day rentals, full-day passes |
 
 `tendency` values: `FIRST`, `SECOND`, `THIRD`, `FOURTH`, `FIFTH` (only months that have a fifth such
-weekday — most do not), `PENULTIMATE`, `LAST`, `ALL`. Several combine (`['FIRST', 'LAST']`); empty means
+weekday, and most do not), `PENULTIMATE`, `LAST`, `ALL`. Several combine (`['FIRST', 'LAST']`); empty means
 `ALL`. With `daysOfWeek: ['MONDAY', 'THURSDAY']` and `tendency: ['FIRST']` you get the first Monday *and*
 the first Thursday.
 
@@ -29,17 +29,17 @@ Every non-ONCE strategy has `start` and `end`, each with three optional parts th
 | `timeOffset` (ISO duration) | Lead time: no slot starts before `now + offset` | Booking window: no slot starts after `now + offset` |
 
 A zero offset (`PT0S`) means "not set". A slot must fit inside the daily window entirely: with
-`09:00`–`11:00` and `slotDuration: PT45M`, `slotInterval: PT45M`, you get 09:00 and 09:45 (10:30 would
+`09:00` to `11:00` and `slotDuration: PT45M`, `slotInterval: PT45M`, you get 09:00 and 09:45 (10:30 would
 end at 11:15).
 
 `overnight: true` moves the window's end to the next local day: `start.time: '22:00'`,
 `end.time: '02:00'` gives 22:00, 23:00, 00:00, 01:00. The day filters (`daysOfWeek`, `months`, `tendency`)
-apply to the day the window opens on. It must be explicit — see the hard rules in `SKILL.md`.
+apply to the day the window opens on. It must be explicit; see the hard rules in `SKILL.md`.
 
 ## Limits
 
 `slotsLimit` (RANGE, PERIODICITY) and `daysLimit` (DAY_RANGE) cap the total a strategy produces, counted
-from its first bookable slot — `max(now + lead time, start.dateTime)` — in chronological order. `0`
+from its first bookable slot, `max(now + lead time, start.dateTime)`, in chronological order. `0`
 produces nothing; absent means unlimited. The count never depends on the viewport a client requests.
 
 ## Examples
@@ -75,7 +75,7 @@ Three whole-day rentals per weekend day, the next 20 weekend days.
 ## Types
 
 ```ts
-// slots/types.ts — backend-neutral shapes. No SDK types cross this line:
+// lib/slots/types.ts: backend-neutral shapes. No SDK types cross this line:
 // instants are ISO 8601 UTC strings ("2026-11-09T08:00:00.000Z"), durations
 // are ISO 8601 durations ("PT45M"), wall-clock times are "HH:mm[:ss]".
 
@@ -145,7 +145,7 @@ export const MONTH_ORDER: readonly Month[] = [
  * One side of a strategy's validity. All three parts are optional and combine:
  * - dateTime:   absolute bound, a UTC instant.
  * - time:       daily wall-clock bound in the strategy's time zone.
- * - timeOffset: bound relative to "now" — on `start` the minimum lead time,
+ * - timeOffset: bound relative to "now": on `start` the minimum lead time,
  *               on `end` the booking window.
  */
 export interface StrategyBound {
@@ -164,7 +164,7 @@ interface StrategyBase {
   labels?: string[] | null;
 }
 
-/** Every matching day: slots of `slotDuration`, every `slotInterval`, inside start.time–end.time. */
+/** Every matching day: slots of `slotDuration`, every `slotInterval`, inside start.time to end.time. */
 export interface RangeStrategy extends StrategyBase {
   strategyType: 'RANGE';
   start: StrategyBound;
@@ -173,7 +173,7 @@ export interface RangeStrategy extends StrategyBase {
   slotInterval: string;
   daysOfWeek?: DayOfWeek[] | null;
   months?: Month[] | null;
-  /** The daily window ends on the next local day (22:00–02:00). Must be explicit. */
+  /** The daily window ends on the next local day (22:00 to 02:00). Must be explicit. */
   overnight?: boolean | null;
   /** Total slots this strategy produces, counted from its first bookable slot. */
   slotsLimit?: number | null;
@@ -262,7 +262,7 @@ messages.
 | `strategy-duration-invalid` | Not `PnW`/`PnD`/`PTnHnMnS`, or zero. Years and months are refused: their length depends on the date |
 | `strategy-time-invalid` | `time` not `HH:mm[:ss]`; `24:00` only as an end |
 | `strategy-bounds-invalid` | `start.dateTime >= end.dateTime`; an instant without `Z`/offset; `end.time <= start.time` without `overnight`; window shorter than one slot; lead time >= booking window |
-| `strategy-interval-invalid` | `slotInterval < slotDuration` — overlapping slots that share no capacity |
+| `strategy-interval-invalid` | `slotInterval < slotDuration`: overlapping slots that share no capacity |
 | `strategy-horizon-invalid` | `end.timeOffset` beyond `maxHorizonDays` |
 | `strategy-limit-invalid` | `slotsLimit`/`daysLimit` negative or fractional |
 | `strategy-end-conflict` | Legacy `end.timePeriod` and `end.timeOffset` both set and different (raised by the normalizer) |
@@ -271,7 +271,7 @@ An instant without a zone is refused rather than assumed UTC: `"2026-11-09T09:00
 wall-clock time from a form, and treating it as UTC is the bug this whole model exists to prevent.
 
 ```ts
-// slots/validate.ts — run on every create AND update, before writing.
+// lib/slots/validate.ts: run on every create AND update, before writing.
 //
 // Errors are `code: detail` strings so an API layer can map the code to a
 // status and a translated message without parsing prose.
@@ -319,7 +319,7 @@ export function validateStrategy(s: SlotStrategy, limits: GenerationLimits = DEF
   const to = timeToSecondsOrFail(s.end.time ?? '24:00', 'end.time');
   const windowSeconds = s.overnight ? to + 86_400 - from : to - from;
   if (!s.overnight && to <= from) {
-    // Never infer "overnight" from end < start: 17:00–09:00 is far more often a typo.
+    // Never infer "overnight" from end < start: 17:00 to 09:00 is far more often a typo.
     fail('strategy-bounds-invalid', 'end.time must be after start.time (set overnight for windows past midnight)');
   }
   if (s.overnight && (to > from || windowSeconds > 86_400)) {

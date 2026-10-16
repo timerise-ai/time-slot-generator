@@ -32,29 +32,29 @@ rules-based access to these collections (absence of a rule is the policy: defaul
 ## Range queries
 
 Firestore here allows range filters on one field per query, so "overlaps [from, to)" is approximated on
-`from`: starts before `range.to` and no earlier than `range.from − MAX_INTERVAL_DAYS`, then filtered
+`from`: starts before `range.to` and no earlier than `range.from - MAX_INTERVAL_DAYS`, then filtered
 exactly on `to` in memory. **`MAX_INTERVAL_DAYS` must be at least the longest booking or block you
-allow** — a 30-day block that started 20 days ago is otherwise never read. Enforce that maximum when
+allow**: a 30-day block that started 20 days ago is otherwise never read. Enforce that maximum when
 writing blocks, or split longer ones.
 
 ## Limits that bite
 
-- `in` and `array-contains-any` take at most 30 values — the store chunks host and owner lists.
-- `undefined` is rejected on write — `toStored` drops it.
+- `in` and `array-contains-any` take at most 30 values; the store chunks host and owner lists.
+- `undefined` is rejected on write; `toStored` drops it.
 - Equality filters skip documents missing the field: write `status` on every booking at create.
 
 ## Caching and listeners
 
 Reading strategies, blocks and bookings on every listing is the simple, correct default. If you add
 `onSnapshot` listeners per service as a cache, bound them: cap the number of live entries (LRU) **and**
-give each an absolute age limit. An idle-timeout alone never fires under steady traffic — every hit
-resets it — and listeners plus per-entry timers accumulate until the process runs out of memory. Never
+give each an absolute age limit. An idle-timeout alone never fires under steady traffic, because every hit
+resets it, and listeners plus per-entry timers accumulate until the process runs out of memory. Never
 cache inside the booking transaction.
 
 ## The store
 
 ```ts
-// slots/firestore-store.ts — SlotStore on the Firebase Admin SDK.
+// lib/slots/firestore-store.ts: SlotStore on the Firebase Admin SDK.
 import {
   FieldValue,
   Timestamp,
@@ -295,7 +295,7 @@ Firestore transactions require every read before the first write; the capacity c
 ## Checklist
 
 - [ ] Composite indexes deployed with the queries
-- [ ] `MAX_INTERVAL_DAYS` ≥ longest booking/block, enforced on write
+- [ ] `MAX_INTERVAL_DAYS` >= longest booking/block, enforced on write
 - [ ] Strategy writes go through `saveStrategy` (validation, zone pin, Timestamps)
 - [ ] No client access to these collections in security rules
 - [ ] Capacity re-checked in `runTransaction`

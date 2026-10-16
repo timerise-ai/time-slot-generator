@@ -1,6 +1,6 @@
 # Time zones
 
-Three representations, each with one job. Mixing them up is the source of nearly every slot bug.
+Three representations, each with one job. Mixing them up causes nearly every slot bug.
 
 | Representation | Example | Used for |
 |---|---|---|
@@ -36,7 +36,7 @@ Three representations, each with one job. Mixing them up is the source of nearly
 
 Consequences worth knowing:
 
-- A RANGE window 02:00–04:00 on a spring-forward night is one hour long; on a fall-back night it is
+- A RANGE window 02:00 to 04:00 on a spring-forward night is one hour long; on a fall-back night it is
   three. Slots are stepped in real time from the window start, so the count follows.
 - A DAY_RANGE slot is 23 or 25 hours on transition days. It always runs to the next local midnight, so
   consecutive days tile without gaps or overlap.
@@ -51,11 +51,11 @@ runtime. If the host already uses `date-fns-tz` or Luxon you may swap the intern
 signatures and the policy above, and keep the tests.
 
 ```ts
-// slots/timezone.ts — wall clock <-> instant conversion on Intl alone.
+// lib/slots/timezone.ts: wall clock <-> instant conversion on Intl alone.
 //
 // Every function here gives the same answer whatever the process TZ is. Never
 // build a Date from a local string (`new Date('2026-03-29T09:00')` is parsed in
-// the *server's* zone) and never read getUTCDay() off a "zoned" Date — both
+// the *server's* zone) and never read getUTCDay() off a "zoned" Date: both
 // tie the output to the machine the code happens to run on.
 
 const MS_PER_MINUTE = 60_000;
@@ -95,7 +95,7 @@ export interface WallClock {
   /** 'YYYY-MM-DD' local calendar date. */
   date: string;
   year: number;
-  /** 1–12. */
+  /** 1 to 12. */
   month: number;
   day: number;
   hour: number;
@@ -139,7 +139,7 @@ export function offsetMinutes(instant: Date, timeZone: string): number {
  *
  * DST policy (same as Temporal's 'compatible' disambiguation):
  * - Gap (the wall time does not exist, 02:30 on a spring-forward night):
- *   shift forward by the gap length — 02:30 becomes 03:30.
+ *   shift forward by the gap length: 02:30 becomes 03:30.
  * - Overlap (the wall time happens twice, 02:30 on a fall-back night):
  *   take the earlier instant.
  * `time` may be "24:00", meaning midnight at the end of `date`.
@@ -164,7 +164,7 @@ export function zonedToUtc(date: string, time: string, timeZone: string): Date {
   return new Date(naive - before * MS_PER_MINUTE);
 }
 
-/** "2026-11-09T09:00:00+01:00" — the instant as the local clock shows it. */
+/** "2026-11-09T09:00:00+01:00": the instant as the local clock shows it. */
 export function formatWithOffset(instant: Date, timeZone: string): string {
   const w = wallClock(instant, timeZone);
   const offset = offsetMinutes(instant, timeZone);
@@ -225,7 +225,7 @@ function pad(value: number): string {
 ```
 
 ```ts
-// slots/duration.ts — ISO 8601 durations as fixed milliseconds.
+// lib/slots/duration.ts: ISO 8601 durations as fixed milliseconds.
 //
 // Days and weeks are exact multiples of 24h here. That is what a slot length or
 // a booking window means ("P30D" = 720 hours from now), and it is what slot IDs
@@ -261,7 +261,7 @@ upgrade old ones at read time with the normalizer below. It pins the zone first,
 defined the wall clock.
 
 ```ts
-// slots/normalize.ts — read-time upgrade of stored strategies. Idempotent.
+// lib/slots/normalize.ts: read-time upgrade of stored strategies. Idempotent.
 //
 // Only needed if strategies were ever stored in the legacy convention, where a
 // `dateTime` held the *wall clock* in UTC fields ("09:00Z" meaning 09:00 in the

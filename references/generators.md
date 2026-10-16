@@ -41,14 +41,14 @@ slotId = md5("<from as UTC ISO>;<slotDuration>;<strategyId>")   // DAY_RANGE use
 
 Slots are not stored, so the ID is how a booking finds its slot again: the booking path regenerates and
 looks the ID up. Editing a strategy's times therefore changes the IDs of its future slots, which is
-correct — those slots no longer exist — but bookings already made keep their own copy of the slot's
+correct, since those slots no longer exist, but bookings already made keep their own copy of the slot's
 instants and must never be re-resolved from the strategy.
 
 On an edge runtime without `node:crypto`, pass a pure-JS md5 as `hashSlotId`. Switching to SHA-256 is
 fine for a new system and breaks every existing ID for an old one.
 
 ```ts
-// slots/slot-id.ts — deterministic slot identity.
+// lib/slots/slot-id.ts: deterministic slot identity.
 //
 // A slot is never stored; it is regenerated on every read and found again by
 // ID. The ID therefore has to be a pure function of what defines the slot:
@@ -69,7 +69,7 @@ export function slotIdInput(from: Date, duration: string, strategyId: string): s
 ## The engine
 
 ```ts
-// slots/generators.ts — strategies -> concrete slots. Pure: no I/O, no clock.
+// lib/slots/generators.ts: strategies -> concrete slots. Pure: no I/O, no clock.
 import { durationToMs } from './duration';
 import { md5SlotId, slotIdInput, type SlotIdHasher } from './slot-id';
 import { addDays, daysInMonth, wallClock, weekdayOf, zonedToUtc } from './timezone';
@@ -281,7 +281,7 @@ function* generatePeriodicity(s: PeriodicityStrategy, ctx: Context): Generator<G
   while (year < last.year || (year === last.year && month <= last.month)) {
     if (matchesMonth(month, s.months)) {
       // Every candidate date of the month, merged and sorted BEFORE emitting.
-      // Walking one weekday at a time (all Sundays, then all Mondays…) and
+      // Walking one weekday at a time (all Sundays, then all Mondays, and so on) and
       // stopping at the first date past the cutoff drops every other weekday.
       for (const date of monthCandidates(year, month, weekdays, tendencies)) {
         for (const from of dailyWindow(date, s, timeZone, durationMs, intervalMs)) {
@@ -381,7 +381,7 @@ function* generateOnce(s: OnceStrategy, ctx: Context): Generator<GeneratedSlot> 
 
 // ---------------------------------------------------------------- shared
 
-/** Slot starts inside one day's start.time–end.time window, in order. */
+/** Slot starts inside one day's start.time to end.time window, in order. */
 function* dailyWindow(
   date: string,
   s: RangeStrategy | PeriodicityStrategy,
@@ -428,11 +428,11 @@ function matchesMonth(month: number, months?: Month[] | null): boolean {
 
 ## Cost
 
-Work is linear in days × slots per day up to the cutoff. A 5-minute RANGE strategy with no end and no
+Work is linear in days times slots per day up to the cutoff. A 5-minute RANGE strategy with no end and no
 viewport is 288 slots a day; the default 731-day horizon makes that about 210 000 iterations, which is
 why `maxSlots` exists and why the listing should always pass a viewport. The booking path cannot pass
-one (it must see every slot to find an ID), so keep the horizon realistic for the product — 90 or 365
-days is typical — and set `end.timeOffset` on strategies.
+one (it must see every slot to find an ID), so keep the horizon realistic for the product (90 or 365
+days is typical) and set `end.timeOffset` on strategies.
 
 ## Checklist
 
