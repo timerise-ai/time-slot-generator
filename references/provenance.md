@@ -1,0 +1,113 @@
+# Provenance
+
+Extracted from the slot engine of a production booking API (GraphQL on Node, Firestore) serving
+appointment, class and rental businesses across time zones from Honolulu to Auckland. That engine had
+already been through one hardening pass: true-UTC storage with a read-time normalizer, local-calendar
+weekday and month bucketing, bounded listener caches, and a single generation per booking. The audit for
+this skill ran the built engine against DST, far-from-UTC and viewport cases and found the defects below;
+each is fixed in the templates and pinned by a test in [testing.md](testing.md). On ordinary windows the
+templates produce the same slot IDs and instants as the original.
+
+## Fixed in the templates
+
+### 1. PERIODICITY dropped every weekday but the first when cut short
+
+Candidates were produced one weekday at a time — all Sundays of the month, then all Mondays — and
+generation returned at the first date past the cutoff. A one-week view returned only the Sunday. The same
+early exit fired on `end.dateTime`, on the booking window and on `slotsLimit`, so it also reached the
+booking path. **Shipped:** each month's dates are merged and sorted before emitting —
+[generators.md](generators.md).
+
+### 2. A local day vanished on DST transitions
+
+Days were advanced by adding 24 hours to an instant. When "now" was late in the evening before a
+23-hour day, the next step landed two local days later; on a 25-hour day the same date came up twice and
+inflated `slotsLimit` counts. **Shipped:** iteration over `YYYY-MM-DD` local dates.
+
+### 3. DAY_RANGE slots were 24 hours on 23- and 25-hour days
+
+The day slot ended at start + 24h, i.e. at 01:00 or 23:00 local on transition days, leaving an hour
+uncovered or double-covered. **Shipped:** slots run to the next local midnight.
+
+### 4. Output depended on the server's time zone
+
+Local strings were parsed with `new Date('…T09:00')` (process zone) and weekdays read with
+`getUTCDay()` on a "zoned" Date (correct only in a UTC process). Production ran in UTC, so it was latent;
+any non-UTC deployment or developer laptop got different slots. **Shipped:** Intl-only helpers —
+[timezones.md](timezones.md) — and a suite run under four process zones.
+
+### 5. `slotsLimit` / `daysLimit` counted from the viewport
+
+The count began at the viewport start, so "the first 10 slots" differed per requested week, and a slot
+shown in a later week was absent from the booking-path generation. **Shipped:** limits count from the
+strategy's first bookable slot.
+
+### 6. The pinned strategy zone was never read
+
+Strategies stored their authoring `timeZone`, but generation used the project's current zone, so
+changing it reinterpreted every strategy. **Shipped:** `strategy.timeZone ?? service.timeZone`.
+
+### 7. External busy time was converted twice or with the wrong zone
+
+Blocks stored both a wall-clock field and a UTC field; generation converted the wall-clock field with the
+*project* zone. Events stored as true UTC were shifted by the project offset; events from a calendar in
+another zone were off by the difference. **Shipped:** blocks are UTC instants only —
+[availability.md](availability.md).
+
+### 8. Working hours compared clock strings
+
+"00:00" sorts before "17:00", so a slot ending at midnight passed 08:00–17:00 hours. **Shipped:**
+instants on the slot's local start date, with next-day closing.
+
+### 9. Working hours applied to the listing only
+
+The booking path looked IDs up in a map built without the working-hours filter, so a slot hidden from the
+listing could be booked by ID. **Shipped:** one `buildAvailability` for both paths.
+
+### 10. Malformed time strings became midnight
+
+An unparseable `time` either fell back to 00:00 or produced an invalid date and no slots, with no
+error either way. **Shipped:** `strategy-time-invalid` at write time.
+
+### 11. A limit of zero produced one slot
+
+The limit was checked only after a slot had been yielded, so `slotsLimit: 0` gave one slot while the
+documentation promised none; a stored `null` likewise stopped the strategy after its first slot.
+**Shipped:** `0` yields nothing, `null` means no cap.
+
+## Kept deliberately
+
+- **Slot ID = md5 of `utcStart;duration;strategyId`.** Not a security token, only an identity; changing
+  it orphans every existing booking reference.
+- **Capacity by overlap, not by slot ID.** A booking reduces every overlapping slot, so two strategies
+  covering the same hours share one capacity. This is what a single bookable unit means.
+- **A host's other commitments block the slot entirely.** A person cannot be in two places.
+- **Resources count bookings, not seats.** One booking occupies one room.
+- **`slotInterval >= slotDuration`.** Overlapping slots from one strategy would share no capacity and
+  double-sell.
+- **Full slots are returned with `quantity: 0`; blocked slots are removed.** "Sold out" and "not offered"
+  are different messages.
+- **A DAY_RANGE day already begun is not offered.**
+- **`PT0S` offsets mean "not set".**
+
+## Added
+
+- **Overnight windows** (`overnight: true`), explicit so a reversed range stays a validation error.
+- **Generation horizon** (`maxHorizonDays`, `maxSlots`, `truncated`), so no strategy generates to 2038.
+- **Per-strategy time zone** honoured by the generators.
+- **Failure isolation**: one malformed strategy is reported in `failed` instead of failing the service.
+- **Supabase/Postgres backend** with the `book_slots` capacity function.
+- **Validation codes** for zone, quantity, durations, times, limits and horizon.
+
+## If you are porting the original
+
+Fix order, most damaging first:
+
+1. PERIODICITY chronological emission (#1) — visible in every bounded view and in the booking path.
+2. External busy time from UTC fields (#7) — double bookings against Outlook/Google events.
+3. Limits counted from the strategy start (#5) — failed bookings of visible slots.
+4. Local-date iteration and DAY_RANGE midnight (#2, #3) — twice a year, every zone with DST.
+5. Pinned zone (#6), working hours (#8, #9), process-TZ independence (#4).
+
+Run the differential check from [testing.md](testing.md) before and after: ordinary windows must not
+change.
