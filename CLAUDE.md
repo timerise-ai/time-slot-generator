@@ -62,14 +62,16 @@ standard every skill follows is `../skills/STANDARD.md`.
 
   For the second line, Node 22.18 or later, with the extensionless imports rewritten to `.ts` in a copy.
   The routes also build with `next build` in a copy of `../skills/eval/fixture` with no environment set.
-  `schema.sql` must apply to a scratch Postgres with a stub `auth.uid()` and an `authenticated` role, and a
-  second `book_slots` call on a full slot must raise `slot-has-not-enough-capacity`. Do not add a
-  `package.json` or test config to this repository.
+  `schema.sql` must apply to a scratch Postgres with a stub `auth.uid()`, the `anon`, `authenticated` and
+  `service_role` roles, and Supabase's default grants on `public` (all tables and functions to all three).
+  There, `anon` must read no `services` row and be refused `book_slots`, and as `service_role` a second
+  `book_slots` call on a full slot, or on an overlapping slot of another ID, must raise
+  `slot-has-not-enough-capacity`. Do not add a `package.json` or test config to this repository.
 - **Never change the slot ID input string** (`md5("<utcStartISO>;<duration>;<strategyId>")`, built in
   `slot-id.ts` in `generators.md`). Every consumer's existing bookings depend on it, and a test pins it.
 - **Test and entry counts are claims.** The suite has 23 tests; the `SKILL.md` description, the README and
   `CHANGELOG.md` repeat the number, and `testing.md` states it. `provenance.md` states its own entry count
-  (27). Change a suite or the ledger, change the numbers.
+  (30). Change a suite or the ledger, change the numbers.
 - **Keep the three indexes in sync** with `references/`: the quick start and the reference directory in
   `SKILL.md`, and the file table in `README.md`.
 - **Identifiers are shared across files.** `generateSlots`, `buildAvailability`, `listServiceSlots`,

@@ -7,7 +7,7 @@ Generated slots say what *could* be booked. Availability subtracts what already 
 | Source | Kind | Effect | Notes |
 |---|---|---|---|
 | Active booking of this service | `BOOKING` | `quantity -= seats` (default 1) | Overlap, not slot ID: a 09:00 to 10:00 booking also reduces an overlapping 09:30 slot of another strategy |
-| Blackout / exception on the service, its location or its hosts | `BLOCK` | Slot removed | Holidays, maintenance, sick days |
+| Blackout / exception on the service, its location, its hosts or its resources | `BLOCK` | Slot removed | Holidays, maintenance, sick days |
 | External calendar busy time of a host | `BLOCK` | Slot removed | Read the stored UTC instants; see below |
 | A host's booking of a **different** service | `BLOCK` | Slot removed | The host is elsewhere |
 | A host's booking of **this** service | none | Already a `BOOKING` | Adding it as `BLOCK` too hides slots with free seats |

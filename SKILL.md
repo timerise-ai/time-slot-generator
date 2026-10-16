@@ -110,21 +110,28 @@ the non-negotiables.
 
 ## Quick start
 
+Copy every code block as written, the schema included. The only edits are the rename table, the host's
+guard at the marked line, and `book_slots` extended with the host's booking columns. A template that
+looks wrong to you is named in the handover, not patched: each odd part has a ledger entry.
+
 1. Read the host and fill the seam contract and the rename table: [adaptation.md](references/adaptation.md).
 2. Copy the types and validation: [strategy-model.md](references/strategy-model.md).
 3. Copy the time helpers, durations and the normalizer: [timezones.md](references/timezones.md).
 4. Copy slot identity and the generators: [generators.md](references/generators.md).
 5. Copy availability and the service entry point: [availability.md](references/availability.md).
-6. Copy the suite, wire it to `npm test` under four `TZ` values and run it:
-   [testing.md](references/testing.md).
-7. Pick a backend: [supabase-backend.md](references/supabase-backend.md) or
-   [firestore-backend.md](references/firestore-backend.md).
+6. `npm i -D vitest`, copy the suite, change only its `node:test` import, wire `npm test` to the four-`TZ`
+   loop and run it: [testing.md](references/testing.md). Your own tests go in a separate file.
+7. Pick a backend and `npm i` its SDK (`@supabase/supabase-js` or `firebase-admin`), never a hand-written
+   client: [supabase-backend.md](references/supabase-backend.md) or
+   [firestore-backend.md](references/firestore-backend.md). The package registry is not an external
+   service; "no external services" means the database and its credentials.
 8. Serve it from route handlers: [nextjs-routes.md](references/nextjs-routes.md).
 9. Rebuilding an existing engine? [provenance.md](references/provenance.md) has the ledger and the fix
    order, and [testing.md](references/testing.md) the differential check.
 
-Hand over with the schema or indexes to apply, the two environment variables, and the place the host's
-guard goes.
+Hand over, every time: the schema file or indexes to apply; `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
+(server only); the file and line where the host's guard goes, and that bookings are public until it does;
+"23 shipped tests pass under four zones", with any tests of your own counted apart.
 
 ## Reference directory
 

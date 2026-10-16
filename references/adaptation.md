@@ -80,6 +80,9 @@ names the references, the tests and the ledger share.
    `firestore-store.ts`.
 6. Copy the routes ([nextjs-routes.md](nextjs-routes.md)) and put the host's guard where they mark it.
 7. Build the host's slot picker and strategy editor on the listing answer and `saveStrategy`.
+8. Hand over: the schema or indexes to apply, the two environment variables, the file and line where the
+   guard goes (bookings are public until it is there), and the 23 shipped tests passing under four zones,
+   counted apart from any tests of your own.
 
 ## Non-negotiables
 

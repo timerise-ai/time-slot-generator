@@ -117,8 +117,9 @@ suite.
 The TypeScript blocks compile as one project under `strict` and `noUncheckedIndexedAccess`, the routes build
 with `next build` in an empty Next.js app with no credentials set, and the suite in
 [testing.md](references/testing.md) passes under `TZ=UTC`, `Europe/Warsaw`, `Pacific/Auckland` and
-`America/Los_Angeles`. The schema was applied to a scratch Postgres, where `book_slots` refused a second
-booking of a full slot with `slot-has-not-enough-capacity`.
+`America/Los_Angeles`. The schema was applied to a scratch Postgres with Supabase's default grants, where
+the anon role read no service and was refused `book_slots`, and `book_slots` refused a second booking of a
+full slot, and of an overlapping slot with another ID, with `slot-has-not-enough-capacity`.
 
 ## Not this
 

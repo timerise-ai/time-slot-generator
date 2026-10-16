@@ -10,8 +10,8 @@ far-from-UTC and viewport cases. On ordinary windows the templates produce the s
 the earlier implementation, which the differential check in [testing.md](testing.md) confirms.
 
 This file is the ledger: what the audit changed and how the templates verify it, what was kept deliberately
-and why it is safe, and what was designed here and has never run in production. 27 entries. Each fix is
-pinned by a test in [testing.md](testing.md).
+and why it is safe, what was designed here and has never run in production, and what the agent evals found
+in the designed parts. 30 entries. Each audit fix is pinned by a test in [testing.md](testing.md).
 
 ## Fixed in the templates
 
@@ -107,6 +107,26 @@ documentation promised none; a stored `null` likewise stopped the strategy after
 - **Validation codes** for zone, quantity, durations, times, limits and horizon.
 - **Next.js route handlers** for the listing and the booking ([nextjs-routes.md](nextjs-routes.md)), with
   credentials read at request time and errors answered by code.
+
+## Found by the agent evals
+
+Defects in the parts designed here, found when agents installing the skill edited a template to close them,
+and reproduced on a scratch Postgres with Supabase's default grants before the template changed.
+
+- **The public key could book.** Postgres lets PUBLIC execute a new function and Supabase grants anon on
+  every table in `public`, so the anon key could call `book_slots` with any capacity and read the host
+  tables the schema creates. **Shipped (0.1.1):** RLS on every table in the schema, and `book_slots`
+  executable by `service_role` only. Apps on 0.1.0 apply both to their database.
+- **The transaction re-counted by slot ID.** The listing counts capacity by overlap, but `book_slots` and
+  `assertCapacityInTransaction` counted only bookings holding the same ID, so overlapping slots of two
+  strategies could both sell the last seat at once. **Shipped (0.1.1):** one lock per service and a seat sum
+  over overlapping bookings, in both stores.
+- **Resource blackouts were never read.** The schema allows `owner_type = 'resource'`, but neither store
+  queried those blocks, so a closed room still offered its slots. **Shipped (0.1.1):** both stores include
+  the service's resources among the block owners.
+
+The first two are checked on that scratch Postgres before each release; the engine suite does not reach the
+stores, so the third rests on the query alone.
 
 ## Fix order when rebuilding an existing engine
 

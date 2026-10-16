@@ -135,6 +135,16 @@ alter table public.slot_strategies enable row level security;
 alter table public.manual_slots enable row level security;
 alter table public.busy_blocks enable row level security;
 
+-- The host-owned tables as well. Supabase grants anon and authenticated on
+-- every table in public, so a table without RLS is readable and writable with
+-- the public key. RLS on with no policy for those roles gives them nothing;
+-- the service role the API uses bypasses RLS. Keep the policies yours have.
+alter table public.project_members enable row level security;
+alter table public.services enable row level security;
+alter table public.locations enable row level security;
+alter table public.resources enable row level security;
+alter table public.bookings enable row level security;
+
 create policy slot_strategies_staff on public.slot_strategies
   for all to authenticated
   using (exists (select 1 from public.project_members m
@@ -157,8 +167,9 @@ create policy busy_blocks_staff on public.busy_blocks
                       where m.project_id = busy_blocks.project_id and m.user_id = (select auth.uid())));
 
 -- The capacity re-check that makes overbooking impossible. Called by the API
--- after prepareBookingSlots() succeeded; the advisory locks serialize
--- concurrent bookings of the same slot, the sum counts seats, not rows.
+-- after prepareBookingSlots() succeeded; the advisory lock serializes
+-- concurrent bookings of the same service, and the sum counts the seats of
+-- every active booking overlapping the slot, the same rule as the listing.
 create or replace function public.book_slots(
   p_project_id uuid,
   p_service_id uuid,
@@ -176,13 +187,16 @@ declare
   v_taken integer;
   v_id uuid;
 begin
-  -- Lock in a stable order so two multi-slot bookings cannot deadlock.
-  for v_slot in select value from jsonb_array_elements(p_slots) order by value->>'slotId' loop
-    perform pg_advisory_xact_lock(hashtextextended(v_slot->>'slotId', 0));
+  -- One lock per service, not per slot ID: overlapping slots of two
+  -- strategies have different IDs and share one capacity.
+  perform pg_advisory_xact_lock(hashtextextended(p_service_id::text, 0));
+  for v_slot in select value from jsonb_array_elements(p_slots) loop
     select coalesce(sum(b.seats), 0) into v_taken
       from public.bookings b
-     where b.slot_ids @> array[v_slot->>'slotId']
-       and b.status in ('PENDING', 'CONFIRMED');
+     where b.service_id = p_service_id
+       and b.status in ('PENDING', 'CONFIRMED')
+       and b.starts_at < (v_slot->>'to')::timestamptz
+       and b.ends_at > (v_slot->>'from')::timestamptz;
     if v_taken + p_seats > (v_slot->>'capacity')::integer then
       raise exception 'slot-has-not-enough-capacity: %', v_slot->>'slotId';
     end if;
@@ -199,6 +213,12 @@ begin
   return v_id;
 end;
 $$;
+
+-- Only the server may call it: it trusts the capacity it is given. Postgres
+-- lets PUBLIC execute every new function, and Supabase grants anon too.
+revoke execute on function public.book_slots(uuid, uuid, jsonb, integer, uuid[], uuid[])
+  from public, anon, authenticated;
+grant execute on function public.book_slots(uuid, uuid, jsonb, integer, uuid[], uuid[]) to service_role;
 ```
 
 What the schema enforces:
@@ -207,9 +227,13 @@ What the schema enforces:
   `(service_id, project_id)` foreign key makes it unrepresentable. Blocks point at several owner types,
   so check the owner's project in the API before inserting one.
 - `using` **and** `with check` on every policy, so a row cannot be moved out of a project by update.
-- `book_slots` takes a transaction-scoped advisory lock per slot ID (in sorted order, so two multi-slot
-  bookings cannot deadlock), sums **seats** of active bookings holding the slot, and inserts only if
-  capacity remains. It is `security invoker` with an empty `search_path`.
+- `book_slots` takes a transaction-scoped advisory lock per service, sums **seats** of the service's active
+  bookings overlapping each slot, and inserts only if capacity remains. Overlap, not slot ID: two
+  strategies covering one hour share its capacity, as in the listing. It is `security invoker` with an
+  empty `search_path`, and only `service_role` may execute it.
+- RLS is on for every table here, the host-owned ones included, and anon and authenticated have no policy
+  on `services`, `locations`, `resources`, `bookings` or `project_members`: the public key reads and writes
+  none of them.
 
 ## The store
 
@@ -308,7 +332,12 @@ export function createSupabaseSlotStore(supabase: SupabaseClient): SlotStore {
         supabase
           .from('busy_blocks')
           .select('starts_at, ends_at')
-          .in('owner_id', [service.serviceId, ...service.hostIds, ...(service.locationId ? [service.locationId] : [])])
+          .in('owner_id', [
+            service.serviceId,
+            ...service.hostIds,
+            ...service.resourceIds,
+            ...(service.locationId ? [service.locationId] : []),
+          ])
           .lt('starts_at', to)
           .gt('ends_at', from)
           .returns<IntervalRow[]>(),

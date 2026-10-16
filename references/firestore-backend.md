@@ -16,7 +16,7 @@ rules-based access to these collections (absence of a rule is the policy: defaul
 | `locations/{id}` | `workingHours` |
 
 `busyBlocks` is one top-level collection rather than an `exceptions` subcollection per owner, so one
-`ownerId in [...]` query covers the service, its location and its hosts.
+`ownerId in [...]` query covers the service, its location, its hosts and its resources.
 
 ## Composite indexes
 
@@ -27,7 +27,7 @@ rules-based access to these collections (absence of a rule is the policy: defaul
 | `bookings` | `resourceIds` ARRAY_CONTAINS, `from` ASC |
 | `busyBlocks` | `ownerId` ASC, `from` ASC |
 
-`slotIds` array-contains (the transaction check) needs only the automatic single-field index.
+The transaction check reads `serviceId` and `from`, the first index above.
 
 ## Range queries
 
@@ -130,7 +130,12 @@ export function createFirestoreSlotStore(db: Firestore): SlotStore {
         }
       }
 
-      const owners = [service.serviceId, ...service.hostIds, ...(service.locationId ? [service.locationId] : [])];
+      const owners = [
+        service.serviceId,
+        ...service.hostIds,
+        ...service.resourceIds,
+        ...(service.locationId ? [service.locationId] : []),
+      ];
       for (const ownerIds of chunk(owners, IN_LIMIT)) {
         const blocks = await overlapping(db.collection('busyBlocks').where('ownerId', 'in', ownerIds), range);
         for (const data of blocks) busy.push({ kind: 'BLOCK', ...interval(data) });
@@ -195,21 +200,31 @@ export async function saveStrategy(
 /**
  * The capacity re-check, inside the booking transaction. Generation ran before
  * the transaction and may be seconds stale; two guests can both see the last
- * seat. Counting seats of the bookings that hold each slot ID, inside the
- * transaction, closes that race: Firestore retries the transaction when a
- * booking it read changes, and a newly added booking makes the retry see it.
+ * seat. Counting seats of this service's bookings that overlap each slot,
+ * inside the transaction, closes that race: Firestore retries the transaction
+ * when a booking it read changes, and a newly added booking makes the retry
+ * see it. Overlap, not slot ID, the same rule as the listing: two strategies
+ * covering one hour share its capacity.
  */
 export async function assertCapacityInTransaction(
   tx: Transaction,
   db: Firestore,
-  slots: Pick<GeneratedSlot, 'slotId' | 'capacity'>[],
+  serviceId: string,
+  slots: Pick<GeneratedSlot, 'slotId' | 'capacity' | 'from' | 'to'>[],
   seats: number
 ): Promise<void> {
   for (const slot of slots) {
-    const holders = await tx.get(db.collection('bookings').where('slotIds', 'array-contains', slot.slotId));
-    const taken = holders.docs
+    const candidates = await tx.get(
+      db
+        .collection('bookings')
+        .where('serviceId', '==', serviceId)
+        .where('from', '>=', Timestamp.fromMillis(slot.from.getTime() - MAX_INTERVAL_DAYS * MS_PER_DAY))
+        .where('from', '<', Timestamp.fromDate(slot.to))
+    );
+    const taken = candidates.docs
       .map(doc => doc.data())
       .filter(data => !INACTIVE.has(data.status as string))
+      .filter(data => (data.to as Timestamp).toMillis() > slot.from.getTime())
       .reduce((sum, data) => sum + (typeof data.seats === 'number' ? data.seats : 1), 0);
     // Seats, not documents: one booking of four people takes four.
     if (taken + seats > slot.capacity) throw new Error(`slot-has-not-enough-capacity: ${slot.slotId}`);
@@ -277,7 +292,7 @@ function chunk<T>(items: T[], size: number): T[][] {
 ```ts
 const slots = await prepareBookingSlots(store, service, slotIds, seats, new Date());
 await db.runTransaction(async tx => {
-  await assertCapacityInTransaction(tx, db, slots, seats); // reads first
+  await assertCapacityInTransaction(tx, db, service.serviceId, slots, seats); // reads first
   tx.set(db.collection('bookings').doc(), {
     projectId, serviceId: service.serviceId, status: 'PENDING', seats,
     slotIds: slots.map(s => s.slotId),

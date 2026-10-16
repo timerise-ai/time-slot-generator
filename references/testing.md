@@ -18,7 +18,9 @@ done
 The file uses `node:test` and `node:assert`, so it needs no dependency. A Next.js app imports without file
 extensions, which Vitest resolves and Node's type stripping does not, so in the app run it under Vitest:
 add `vitest` as a dev dependency, replace the `node:test` import with `import { describe, it } from
-'vitest'`, and nothing else changes. Wire the loop above to `npm test` as one script:
+'vitest'`, and nothing else changes. Install it from the package registry with `npm i -D vitest`; an
+unattended run's "no external services" means the database, not npm. Do not convert the suite, rewrite its
+imports or compile it with a runner of your own. Wire the loop above to `npm test` as one script:
 
 ```json
 "test": "for tz in UTC Europe/Warsaw Pacific/Auckland America/Los_Angeles; do TZ=$tz vitest run lib/slots || exit 1; done"
@@ -341,6 +343,8 @@ assert.deepEqual(next, prev);
 
 ## Checklist
 
-- [ ] Suite passes under `UTC` and a DST zone (ideally all four)
+- [ ] `engine.test.ts` as shipped apart from its `node:test` import, run by Vitest from `npm test`
+- [ ] Suite passes under `UTC` and a DST zone (ideally all four), and the handover reports the 23 shipped
+      tests apart from any of your own, which live in a separate file
 - [ ] Differential check identical on an ordinary window before cut-over
 - [ ] New strategy features land with a test in the matching group
