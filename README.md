@@ -56,7 +56,7 @@ mkdir -p ~/.agents/skills
 ln -s ~/.claude/skills/time-slot-generator ~/.agents/skills/time-slot-generator
 ```
 
-Update with `git pull` in the clone. The current release is **0.1.2**. See [CHANGELOG.md](CHANGELOG.md).
+Update with `git pull` in the clone. The current release is **0.1.3**. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Activation
 
