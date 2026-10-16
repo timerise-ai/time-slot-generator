@@ -1,8 +1,8 @@
 # Testing
 
-The engine is pure, so it is tested without a database, a clock or a mock. The suite below covers every
-defect listed in [provenance.md](provenance.md) and the behaviours the other references promise. Put it
-next to the engine files and keep it passing.
+The engine is pure, so it is tested without a database, a clock or a mock. The suite below has 23 tests.
+It pins every fix listed in [provenance.md](provenance.md) and the behaviours the other references
+promise. Put it next to the engine files and keep it passing.
 
 ## Run it under several process zones
 
@@ -11,13 +11,21 @@ least `UTC` and one zone with DST; CI should do all four:
 
 ```bash
 for tz in UTC Europe/Warsaw Pacific/Auckland America/Los_Angeles; do
-  TZ=$tz npx vitest run slots/engine.test.ts   # or: TZ=$tz node --test slots/engine.test.ts
+  TZ=$tz npx vitest run lib/slots/engine.test.ts || exit 1
 done
 ```
 
-The file uses `node:test` and `node:assert` so it runs with no dependency on Node 22.18+ (`node --test`
-strips the types). Under vitest, replace the `node:test` import with `import { describe, it } from
-'vitest'`; nothing else changes. If your imports need extensions (`./generators.js`), add them.
+The file uses `node:test` and `node:assert`, so it needs no dependency. A Next.js app imports without file
+extensions, which Vitest resolves and Node's type stripping does not, so in the app run it under Vitest:
+add `vitest` as a dev dependency, replace the `node:test` import with `import { describe, it } from
+'vitest'`, and nothing else changes. Wire the loop above to `npm test` as one script:
+
+```json
+"test": "for tz in UTC Europe/Warsaw Pacific/Auckland America/Los_Angeles; do TZ=$tz vitest run lib/slots || exit 1; done"
+```
+
+Without Vitest, Node 22.18 or later runs the file as it is (`TZ=$tz node --test lib/slots/engine.test.ts`)
+once the relative imports name their `.ts` extension and `tsconfig.json` sets `allowImportingTsExtensions`.
 
 ## What each group pins
 
@@ -28,16 +36,16 @@ strips the types). Under vitest, replace the `node:test` import with `import { d
 | DAY_RANGE | Midnight-to-midnight slots, 24/25/24 hours, tiling without gaps |
 | Limits and viewports | `slotsLimit` independent of the viewport; lead time and booking window; horizon cap and `truncated`; one bad strategy isolated |
 | Time zones | Pinned zone wins; gap forward, overlap earlier, Lord Howe's 30-minute shift, `24:00`; offsets including +05:30 |
-| Overnight windows | 22:00–02:00, including yesterday's window continuing after midnight |
+| Overnight windows | 22:00 to 02:00, including yesterday's window continuing after midnight |
 | Availability | Seats subtracted, blocks remove, resources cap; working hours reject a slot past midnight; booking lookup errors |
 | Identity, validation, normalization | Slot ID format; authoring mistakes refused; legacy upgrade correct and idempotent |
 
 ## The suite
 
 ```ts
-// slots/engine.test.ts — node:test, no dependencies. Run it under several
+// lib/slots/engine.test.ts: node:test, no dependencies. Run it under several
 // process time zones; the results must not change:
-//   for tz in UTC Europe/Warsaw Pacific/Auckland America/Los_Angeles; do TZ=$tz node --test; done
+//   for tz in UTC Europe/Warsaw Pacific/Auckland America/Los_Angeles; do TZ=$tz npx vitest run lib/slots; done
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
@@ -236,7 +244,7 @@ describe('time zones', () => {
 });
 
 describe('overnight windows', () => {
-  it('runs 22:00–02:00 and continues yesterday’s window after midnight', () => {
+  it('runs 22:00 to 02:00 and continues the previous window after midnight', () => {
     const { slots } = generateSlots(
       [range({ overnight: true, start: { time: '22:00' }, end: { time: '02:00' } })],
       { now: new Date('2026-11-09T23:30:00Z'), to: new Date('2026-11-10T23:59:00Z'), timeZone: WAW } // 00:30 local
@@ -273,8 +281,8 @@ describe('availability', () => {
     );
   });
 
-  it('rejects a slot that ends after midnight against 08:00–17:00 hours', () => {
-    const late = { from: new Date('2026-11-09T22:00:00Z'), to: new Date('2026-11-09T23:00:00Z') }; // 23:00–00:00 local
+  it('rejects a slot that ends after midnight against 08:00 to 17:00 hours', () => {
+    const late = { from: new Date('2026-11-09T22:00:00Z'), to: new Date('2026-11-09T23:00:00Z') }; // 23:00 to 00:00 local
     assert.equal(isWithinWorkingHours(late, WAW, { MONDAY: { timeFrom: '08:00', timeTo: '17:00' } }), false);
     assert.equal(isWithinWorkingHours(late, WAW, { MONDAY: { timeFrom: '08:00' } }), true);
   });
@@ -319,7 +327,7 @@ describe('identity, validation, normalization', () => {
 ## Porting an existing engine: a differential check
 
 Before switching, run the old and new generators side by side over an ordinary window (no DST change,
-no viewport cut mid-month) and compare `slotId + from + to` sets. They must be identical — that proves
+no viewport cut mid-month) and compare `slotId + from + to` sets. They must be identical; that proves
 existing slot IDs and bookings still resolve. Then run both over the DST and week-view cases above: the
 differences you see are the fixes.
 

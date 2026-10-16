@@ -7,7 +7,7 @@
 RLS is the primary control in Postgres, unlike Firestore's Admin SDK. Staff manage configuration through
 RLS policies scoped by project membership. **Public slot listings and bookings go through the API**, which
 calls the store with a server-side client after its own checks; the anon role gets nothing on these
-tables. If the API uses the service-role key, it bypasses RLS entirely — resolve the service and its
+tables. If the API uses the service-role key, it bypasses RLS entirely: resolve the service and its
 `project_id` from the database before every call, never from the request body.
 
 ## Mapping from the neutral model
@@ -18,7 +18,7 @@ tables. If the API uses the service-role key, it bypasses RLS entirely — resol
 | Strategy | `slot_strategies` row: `strategy_type`, `time_zone`, `storage_version` columns + `definition jsonb` |
 | Manual slot | `manual_slots`, primary key = the slot ID |
 | Busy block | `busy_blocks` with `owner_type` / `owner_id` |
-| Overlap query | `starts_at < :to and ends_at > :from` — exact, no lookback window |
+| Overlap query | `starts_at < :to and ends_at > :from`, exact, no lookback window |
 | Host / resource membership | `uuid[]` columns with GIN indexes, queried with `&&` (`.overlaps()`) |
 
 `definition` is jsonb because strategy shapes differ by type and are always read whole. `time_zone` is a
@@ -46,6 +46,9 @@ create table if not exists public.services (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null,
   time_zone text not null default 'UTC',
+  host_ids uuid[] not null default '{}',
+  location_id uuid,
+  resource_ids uuid[] not null default '{}',
   unique (id, project_id)
 );
 
@@ -117,7 +120,7 @@ create table public.busy_blocks (
   owner_id uuid not null,
   starts_at timestamptz not null,
   ends_at timestamptz not null,
-  source text not null default 'manual', -- 'manual' | 'google' | 'microsoft' | …
+  source text not null default 'manual', -- 'manual' | 'google' | 'microsoft' | ...
   external_id text,
   description text,
   check (ends_at > starts_at),
@@ -159,7 +162,7 @@ create policy busy_blocks_staff on public.busy_blocks
 create or replace function public.book_slots(
   p_project_id uuid,
   p_service_id uuid,
-  p_slots jsonb, -- [{ "slotId": "…", "capacity": 4, "from": "…Z", "to": "…Z" }]
+  p_slots jsonb, -- [{ "slotId": "...", "capacity": 4, "from": "...Z", "to": "...Z" }]
   p_seats integer,
   p_host_ids uuid[] default '{}',
   p_resource_ids uuid[] default '{}'
@@ -211,7 +214,7 @@ What the schema enforces:
 ## The store
 
 ```ts
-// slots/supabase-store.ts — SlotStore on supabase-js. Server-side only: it
+// lib/slots/supabase-store.ts: SlotStore on supabase-js. Server-side only: it
 // runs after the host's auth guard, with a client whose RLS role can read
 // the service's rows (see supabase-backend.md for the posture).
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -404,7 +407,7 @@ if (error?.message.startsWith('slot-has-not-enough-capacity')) {
 ```
 
 Extend `book_slots` with the host's own booking columns (guest, price, status) rather than inserting
-separately — the capacity check and the insert must share one transaction.
+separately: the capacity check and the insert must share one transaction.
 
 ## Realtime vs polling
 
