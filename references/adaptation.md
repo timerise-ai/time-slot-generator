@@ -70,9 +70,10 @@ names the references, the tests and the ledger share.
 
 1. Read the host: data store, auth, how services, locations and bookings are stored, test runner. Fill the
    right-hand column of the seam contract and the rename table before writing code.
-2. Copy `types.ts` and `validate.ts` ([strategy-model.md](strategy-model.md)), `timezone.ts`, `duration.ts`
-   and `normalize.ts` ([timezones.md](timezones.md)), then `slot-id.ts` and `generators.ts`
-   ([generators.md](generators.md)).
+2. Copy with the command in `SKILL.md`'s quick start, which writes every block below to its path; never
+   retype a block. The files are `types.ts` and `validate.ts` ([strategy-model.md](strategy-model.md)),
+   `timezone.ts`, `duration.ts` and `normalize.ts` ([timezones.md](timezones.md)), then `slot-id.ts` and
+   `generators.ts` ([generators.md](generators.md)).
 3. Copy `availability.ts` and `service.ts` ([availability.md](availability.md)).
 4. Copy `engine.test.ts` ([testing.md](testing.md)), wire it to `npm test` under four time zones, and run
    it. Nothing so far touches a database.

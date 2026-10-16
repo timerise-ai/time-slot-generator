@@ -110,24 +110,33 @@ the non-negotiables.
 
 ## Quick start
 
-Copy every code block as written, the schema included, with a short script that writes each fenced block to
-the path on its first line; retyped files drift. The only edits are the rename table, the host's guard at
-the marked line, and `book_slots` extended with the host's booking columns. A template that looks wrong to
-you is named in the handover, not patched: each odd part has a ledger entry.
+Copy the code blocks with this command from the app root, `S` set to this skill's folder; never retype them,
+retyped files drift. It writes each `ts` block to the path on its first line and the schema to
+`supabase/schema.sql`. On Firestore, name `firestore-backend` in place of the last two references.
+
+```bash
+node -e 'const fs = require("fs"), path = require("path"), put = (out, body) =>
+  (fs.mkdirSync(path.dirname(out), { recursive: true }), fs.writeFileSync(out, body));
+for (const text of process.argv.slice(1).map(file => fs.readFileSync(file, "utf8"))) {
+  for (const m of text.matchAll(/\x60{3}ts\n(\/\/ ((?:lib|app)\/[^:\s]+):[\s\S]*?)\x60{3}/g)) put(m[2], m[1]);
+  for (const m of text.matchAll(/\x60{3}sql\n([\s\S]*?)\x60{3}/g)) put("supabase/schema.sql", m[1]);
+}' "$S"/references/{strategy-model,timezones,generators,availability,testing,supabase-backend,nextjs-routes}.md
+```
+
+The only edits after it are the rename table, the guard at the marked line, and `book_slots` extended with
+the host's booking columns. A template that looks wrong is named in the handover, never patched.
 
 1. Read the host and fill the seam contract and the rename table: [adaptation.md](references/adaptation.md).
-2. Copy the types and validation: [strategy-model.md](references/strategy-model.md).
-3. Copy the time helpers, durations and the normalizer: [timezones.md](references/timezones.md).
-4. Copy slot identity and the generators: [generators.md](references/generators.md).
-5. Copy availability and the service entry point: [availability.md](references/availability.md).
-6. `npm i -D vitest`, copy the suite, change only its `node:test` import, wire `npm test` to the four-`TZ`
-   loop and run it: [testing.md](references/testing.md). Your own tests go in a separate file.
-7. Pick a backend and `npm i` its SDK (`@supabase/supabase-js` or `firebase-admin`), never a hand-written
-   client: [supabase-backend.md](references/supabase-backend.md) or
-   [firestore-backend.md](references/firestore-backend.md). The package registry is not an external
-   service; "no external services" means the database and its credentials.
-8. Serve it from route handlers: [nextjs-routes.md](references/nextjs-routes.md).
-9. Rebuilding an existing engine? [provenance.md](references/provenance.md) has the ledger and the fix
+2. Run the command, then read what it wrote: the model in [strategy-model.md](references/strategy-model.md),
+   zones in [timezones.md](references/timezones.md), the engine in [generators.md](references/generators.md),
+   availability in [availability.md](references/availability.md).
+3. `npm i -D vitest`, change only the suite's `node:test` import, wire `npm test` to the four-`TZ` loop and
+   run it: [testing.md](references/testing.md). Your own tests go in a separate file.
+4. `npm i` the backend SDK (`@supabase/supabase-js` or `firebase-admin`), never a hand-written client:
+   [supabase-backend.md](references/supabase-backend.md) or
+   [firestore-backend.md](references/firestore-backend.md). The package registry is not an external service.
+5. Serve it from route handlers: [nextjs-routes.md](references/nextjs-routes.md).
+6. Rebuilding an existing engine? [provenance.md](references/provenance.md) has the ledger and the fix
    order, and [testing.md](references/testing.md) the differential check.
 
 Hand over, every time: the schema file or indexes to apply; `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
