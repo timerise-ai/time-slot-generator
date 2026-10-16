@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-10-16
+
+Security fix release, from scoring the prompt-1 agent eval runs against 0.1.0.
+
+### Security
+
+- The anon key could book any number of seats. Postgres lets PUBLIC execute a new function and Supabase grants
+  anon on every table in `public`, so `book_slots` was callable with a forged capacity and the host tables the
+  schema creates were readable and writable with the public key. The schema now enables RLS on every table it
+  creates and grants `book_slots` to `service_role` only. Apps built from 0.1.0 on Supabase apply the new
+  `alter table ... enable row level security` lines and the `revoke` and `grant` on `book_slots` to their
+  database (`references/supabase-backend.md`).
+
+### Fixed
+
+- The capacity re-check counted bookings by slot ID while the listing counts by overlap, so overlapping slots
+  of two strategies could both sell the last seat. `book_slots` takes one lock per service and sums the seats
+  of overlapping bookings; `assertCapacityInTransaction` takes the service ID and does the same. Apps built
+  from 0.1.0 copy both in (`references/supabase-backend.md`, `references/firestore-backend.md`).
+- Blackouts on resources were never read. Both stores include the service's resources among the block owners.
+
+### Changed
+
+- The quick start says to copy every block as written, to install Vitest and the backend SDK from the
+  package registry, to keep tests of one's own apart from the shipped suite, and lists what the handover
+  carries (`SKILL.md`, `references/testing.md`, `references/adaptation.md`).
+- Three ledger entries for the eval findings (`references/provenance.md`, now 30 entries).
+
 ## [0.1.0] - 2026-10-16
 
 First release: the slot engine of a booking platform, written by the engineer who builds it and audited
