@@ -24,3 +24,8 @@ isolated: true
 timedOut: false
 runUrl: https://github.com/timerise-ai/time-slot-generator/actions/runs/38960913028
 ---
+
+Rubric 8/8, scored from the final summary. Both packages installed from npm, the 23 shipped tests reported
+apart from two of its own in `lib/slots/studio.test.ts`, and a complete handover: the schema, both
+server-only variables, the guard at `app/api/bookings/route.ts:31`, the template's line, and that anyone can
+book until it is there.
