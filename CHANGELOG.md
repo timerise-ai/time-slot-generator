@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-10-16
+
+Fix release, from scoring the dispatched prompt-1 agent eval runs against 0.1.1.
+
+### Fixed
+
+- The public listing had no viewport by default: `MAX_VIEWPORT_DAYS` applied only when both `from` and `to`
+  were sent, and a request with neither listed every slot to the two-year horizon. `from` now defaults to
+  now and `to` to `MAX_VIEWPORT_DAYS` after it. Apps built from earlier versions copy the listing route in
+  (`references/nextjs-routes.md`).
+- Supabase bookings kept no copy of their slots, which the booking path promises. `bookings` gains a `slots`
+  jsonb column, `book_slots` fills it, and the booking route passes each slot's `strategyId` and `duration`.
+  Apps built from earlier versions add the column and replace the function and the route
+  (`references/supabase-backend.md`, `references/nextjs-routes.md`).
+
+### Changed
+
+- `SKILL.md` says to write each block to its path with a script rather than retype it, and the routes
+  reference says `runtime` and `dynamic` exports add nothing.
+- Two ledger entries for the eval findings (`references/provenance.md`, now 32 entries).
+
 ## [0.1.1] - 2026-10-16
 
 Security fix release, from scoring the prompt-1 agent eval runs against 0.1.0.
