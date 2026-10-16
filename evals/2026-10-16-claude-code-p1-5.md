@@ -24,3 +24,7 @@ isolated: true
 timedOut: false
 runUrl: https://github.com/timerise-ai/time-slot-generator/actions/runs/38962813187
 ---
+
+Rubric 8/8, scored from the final summary. `book_slots` is left as shipped, both packages come from npm, the
+23 shipped tests are reported apart from three of its own in `lib/slots/studio.test.ts`, and the handover
+names `supabase/schema.sql`, both server-only variables and the guard at `app/api/bookings/route.ts:31`.
