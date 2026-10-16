@@ -24,3 +24,8 @@ isolated: true
 timedOut: false
 runUrl: https://github.com/timerise-ai/time-slot-generator/actions/runs/38958996594
 ---
+
+Rubric 8/8, scored from the final summary. It installed `@supabase/supabase-js` and Vitest, reports the 23
+shipped tests apart from three of its own in `lib/slots/studio-schedule.test.ts`, lists both variables in
+`.env.example`, and hands over the migration, the variables and the guard at the comment opening `POST`, with
+bookings public until it is there.
