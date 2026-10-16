@@ -24,3 +24,8 @@ isolated: true
 timedOut: false
 runUrl: https://github.com/timerise-ai/time-slot-generator/actions/runs/38957335109
 ---
+
+Rubric 8/8, scored from the final summary. It reports the 23 shipped tests apart from four of its own in
+`lib/slots/studio.test.ts`, and hands over the migration, both server-only variables and the guard at
+`app/api/bookings/route.ts:31`, the line the template marks. Nothing in the summary suggests a template edit;
+the anon refusal it checked on a local Postgres is now the template's own.
