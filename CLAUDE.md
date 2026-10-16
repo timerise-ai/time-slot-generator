@@ -71,7 +71,7 @@ standard every skill follows is `../skills/STANDARD.md`.
   `slot-id.ts` in `generators.md`). Every consumer's existing bookings depend on it, and a test pins it.
 - **Test and entry counts are claims.** The suite has 23 tests; the `SKILL.md` description, the README and
   `CHANGELOG.md` repeat the number, and `testing.md` states it. `provenance.md` states its own entry count
-  (30). Change a suite or the ledger, change the numbers.
+  (32). Change a suite or the ledger, change the numbers.
 - **Keep the three indexes in sync** with `references/`: the quick start and the reference directory in
   `SKILL.md`, and the file table in `README.md`.
 - **Identifiers are shared across files.** `generateSlots`, `buildAvailability`, `listServiceSlots`,

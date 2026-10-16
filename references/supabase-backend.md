@@ -69,6 +69,7 @@ create table if not exists public.bookings (
   project_id uuid not null,
   service_id uuid not null references public.services (id),
   slot_ids text[] not null default '{}',
+  slots jsonb not null default '[]', -- a copy of each booked slot: slotId, strategyId, duration, from, to
   host_ids uuid[] not null default '{}',
   resource_ids uuid[] not null default '{}',
   starts_at timestamptz not null,
@@ -173,7 +174,8 @@ create policy busy_blocks_staff on public.busy_blocks
 create or replace function public.book_slots(
   p_project_id uuid,
   p_service_id uuid,
-  p_slots jsonb, -- [{ "slotId": "...", "capacity": 4, "from": "...Z", "to": "...Z" }]
+  -- [{ "slotId", "capacity", "strategyId", "duration", "from", "to" }], instants in UTC
+  p_slots jsonb,
   p_seats integer,
   p_host_ids uuid[] default '{}',
   p_resource_ids uuid[] default '{}'
@@ -202,9 +204,10 @@ begin
     end if;
   end loop;
 
-  insert into public.bookings (project_id, service_id, slot_ids, host_ids, resource_ids, starts_at, ends_at, seats)
+  insert into public.bookings (project_id, service_id, slot_ids, slots, host_ids, resource_ids, starts_at, ends_at, seats)
   select p_project_id, p_service_id,
          array(select value->>'slotId' from jsonb_array_elements(p_slots)),
+         (select jsonb_agg(value - 'capacity') from jsonb_array_elements(p_slots)),
          p_host_ids, p_resource_ids,
          (select min((value->>'from')::timestamptz) from jsonb_array_elements(p_slots)),
          (select max((value->>'to')::timestamptz) from jsonb_array_elements(p_slots)),
@@ -425,7 +428,10 @@ const slots = await prepareBookingSlots(store, service, slotIds, seats, new Date
 const { data: bookingId, error } = await supabase.rpc('book_slots', {
   p_project_id: projectId,
   p_service_id: service.serviceId,
-  p_slots: slots.map(s => ({ slotId: s.slotId, capacity: s.capacity, from: s.from.toISOString(), to: s.to.toISOString() })),
+  p_slots: slots.map(s => ({
+    slotId: s.slotId, capacity: s.capacity, strategyId: s.strategyId, duration: s.duration,
+    from: s.from.toISOString(), to: s.to.toISOString(),
+  })),
   p_seats: seats,
   p_host_ids: service.hostIds,
   p_resource_ids: service.resourceIds,

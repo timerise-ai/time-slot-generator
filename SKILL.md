@@ -110,9 +110,10 @@ the non-negotiables.
 
 ## Quick start
 
-Copy every code block as written, the schema included. The only edits are the rename table, the host's
-guard at the marked line, and `book_slots` extended with the host's booking columns. A template that
-looks wrong to you is named in the handover, not patched: each odd part has a ledger entry.
+Copy every code block as written, the schema included, with a short script that writes each fenced block to
+the path on its first line; retyped files drift. The only edits are the rename table, the host's guard at
+the marked line, and `book_slots` extended with the host's booking columns. A template that looks wrong to
+you is named in the handover, not patched: each odd part has a ledger entry.
 
 1. Read the host and fill the seam contract and the rename table: [adaptation.md](references/adaptation.md).
 2. Copy the types and validation: [strategy-model.md](references/strategy-model.md).

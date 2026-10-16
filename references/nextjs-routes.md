@@ -17,6 +17,9 @@ keep their shape.
   resources and project from the `services` row. Nothing that scopes a query is read from the request.
 - **Errors keep their codes.** Engine errors are `Error('<code>: <detail>')`; the routes answer with the
   code, never the detail, and map it to a status in one place.
+- **Nothing to add.** Route handlers that read the request are dynamic and on Node.js already, so
+  `runtime` and `dynamic` exports change nothing; the listing already defaults and bounds its viewport. The
+  one documented variant is a `serviceId` format check, below.
 
 ## Server client and service lookup
 
@@ -103,7 +106,8 @@ that is not well formed reaches Postgres and fails there, which `errorResponse` 
 
 `GET /api/slots?serviceId=<id>&from=<ISO>&to=<ISO>`. `from` and `to` are the viewport; the answer does not
 depend on them beyond which slots are in it, because limits count from the strategy start
-([generators.md](generators.md)).
+([generators.md](generators.md)). `from` defaults to now and `to` to `MAX_VIEWPORT_DAYS` after `from`, so a
+request without them is bounded too; the engine alone would list every slot up to the horizon.
 
 ```ts
 // app/api/slots/route.ts: the listing. Public, so it reads only what a guest may see.
@@ -129,14 +133,16 @@ export async function GET(request: NextRequest): Promise<Response> {
     const params = request.nextUrl.searchParams;
     const serviceId = params.get('serviceId');
     if (!serviceId) throw new Error('request-invalid: serviceId is required');
-    const from = instant(params.get('from'), 'from');
-    const to = instant(params.get('to'), 'to');
-    if (from && to && (to <= from || to.getTime() - from.getTime() > MAX_VIEWPORT_DAYS * 86_400_000)) {
+    // Always a bounded viewport: without `to` the engine would list up to the horizon.
+    const now = new Date();
+    const from = instant(params.get('from'), 'from') ?? now;
+    const to = instant(params.get('to'), 'to') ?? new Date(from.getTime() + MAX_VIEWPORT_DAYS * 86_400_000);
+    if (to <= from || to.getTime() - from.getTime() > MAX_VIEWPORT_DAYS * 86_400_000) {
       throw new Error(`request-invalid: to must follow from by at most ${MAX_VIEWPORT_DAYS} days`);
     }
 
     const service = await loadBookableService(getServiceClient(), serviceId);
-    const result = await listServiceSlots(getSlotStore(), service, { now: new Date(), from, to });
+    const result = await listServiceSlots(getSlotStore(), service, { now, from, to });
     return Response.json(
       { timeZone: service.timeZone, slots: result.slots, truncated: result.truncated },
       { headers: { 'Cache-Control': 'no-store' } }
@@ -198,6 +204,8 @@ export async function POST(request: Request): Promise<Response> {
       p_slots: slots.map(slot => ({
         slotId: slot.slotId,
         capacity: slot.capacity,
+        strategyId: slot.strategyId,
+        duration: slot.duration,
         from: slot.from.toISOString(),
         to: slot.to.toISOString(),
       })),

@@ -11,7 +11,7 @@ the earlier implementation, which the differential check in [testing.md](testing
 
 This file is the ledger: what the audit changed and how the templates verify it, what was kept deliberately
 and why it is safe, what was designed here and has never run in production, and what the agent evals found
-in the designed parts. 30 entries. Each audit fix is pinned by a test in [testing.md](testing.md).
+in the designed parts. 32 entries. Each audit fix is pinned by a test in [testing.md](testing.md).
 
 ## Fixed in the templates
 
@@ -124,9 +124,15 @@ and reproduced on a scratch Postgres with Supabase's default grants before the t
 - **Resource blackouts were never read.** The schema allows `owner_type = 'resource'`, but neither store
   queried those blocks, so a closed room still offered its slots. **Shipped (0.1.1):** both stores include
   the service's resources among the block owners.
+- **The public listing had no viewport by default.** `MAX_VIEWPORT_DAYS` applied only when both `from` and
+  `to` were sent; with neither, one weekday strategy listed 8337 slots up to the two-year horizon.
+  **Shipped (0.1.2):** `from` defaults to now and `to` to `MAX_VIEWPORT_DAYS` after it.
+- **Supabase bookings kept no slot copy.** The booking path promises a copy of each slot, which the
+  Firestore write kept and `book_slots` did not, so an edited strategy left a booking with IDs alone.
+  **Shipped (0.1.2):** a `slots` jsonb column filled by `book_slots` from what the route passes.
 
-The first two are checked on that scratch Postgres before each release; the engine suite does not reach the
-stores, so the third rests on the query alone.
+The first two and the last are checked on that scratch Postgres before each release; the engine suite does
+not reach the stores or the routes, so the third and the fourth rest on the code alone.
 
 ## Fix order when rebuilding an existing engine
 
