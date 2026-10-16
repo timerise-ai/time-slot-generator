@@ -24,3 +24,10 @@ isolated: true
 timedOut: false
 runUrl: https://github.com/timerise-ai/time-slot-generator/actions/runs/38924586022
 ---
+
+Rubric 6/8, scored from the final summary. The routes, the guard comment and the handover are right: it
+names the migration to apply, both variables and the line where the guard goes. Item 2 fails: it changed the
+schema so the anon key can neither read the tables nor call `book_slots`. That edit closed a real hole, the
+anon key booking any number of seats under Supabase's default grants, fixed in the template in 0.1.1, but a
+template edit is still a deviation. Item 3 fails on the letter: it reports 28 tests per zone rather than the
+23 shipped, without saying where the other five live; nothing in the skill asked it to count them apart.

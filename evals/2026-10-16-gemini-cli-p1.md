@@ -24,3 +24,10 @@ isolated: true
 timedOut: false
 runUrl: https://github.com/timerise-ai/time-slot-generator/actions/runs/38924586022
 ---
+
+Rubric 6/8, scored from the final summary; Gemini CLI was not available for a local rerun, so item 2 holds on
+the summary alone. It installed Vitest and wired the four-zone loop. Item 3 fails: it reports 26 tests and
+says it added studio and concurrency tests without saying whether they went into `engine.test.ts`, so the
+shipped 23 are not reported. Item 8 fails: the summary names both variables but neither tells the operator to
+apply `supabase/schema.sql` nor where the guard goes. The skill's single handover sentence sat below the quick
+start and was easy to skip.
